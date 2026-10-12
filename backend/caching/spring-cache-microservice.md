@@ -1,6 +1,6 @@
-# Spring Boot Microservice --- Cache, Redis avec fallback local Caffeine et Idempotency
+# Spring Boot Microservice — Cache
 
-## 🎯 Objectif du cours
+## 🎯 Objectif
 
 Ce document présente progressivement :
 
