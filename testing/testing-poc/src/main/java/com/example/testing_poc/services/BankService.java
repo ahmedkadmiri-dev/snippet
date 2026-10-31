@@ -1,19 +1,19 @@
-package com.example.testing_poc.service;
+package com.example.testing_poc.services;
 
-import com.example.testing_poc.dto.*;
+import com.example.testing_poc.dtos.*;
 import java.util.List;
 
 public interface BankService {
 
-    List<ReferentielDto> getReferentiel(String type);
+    List<ReferentielDto> getReferentiels(String type);
 
-    AccountDto getAccountById(Long id);
+    AccountDto getAccount(Long id);
 
     AccountDto createAccount(CreateAccountRequest request);
 
     CreditCalculationResponse calculateCredit(CreditCalculationRequest request);
 
-    TransferResponse executeTransfer(TransferRequest request);
+    TransferResponse transfer(TransferRequest request);
 
     void deleteAccount(Long id);
 }

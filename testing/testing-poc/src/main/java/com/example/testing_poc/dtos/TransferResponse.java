@@ -1,4 +1,4 @@
-package com.example.testing_poc.dto;
+package com.example.testing_poc.dtos;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
