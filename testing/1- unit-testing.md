@@ -1,31 +1,43 @@
 # 01 - Unit Testing (Tests unitaires)
 
-## 1. Définition
+## 1. Introduction
 
-Le test unitaire est une pratique de test logiciel qui consiste à vérifier le comportement d'une unité de code de manière isolée.
+Le **Unit Testing (test unitaire)** est une pratique de test logiciel qui consiste à vérifier le comportement d'une unité de code de manière isolée, indépendamment de ses dépendances externes.
 
-Une unité peut être une méthode, une classe ou un composant ayant une responsabilité précise.
+Dans une architecture microservices, chaque microservice possède son propre périmètre fonctionnel, ses responsabilités et ses composants. Les tests doivent donc être organisés indépendamment pour chaque microservice.
 
-L'objectif est de vérifier que chaque unité fonctionne conformément au comportement attendu, indépendamment de ses dépendances externes.
+L'approche consiste à tester séparément les différentes couches de chaque microservice :
 
-Dans l'écosystème Java Spring Boot, les tests unitaires reposent principalement sur **JUnit 5** et **Mockito**.
+1. **REST Layer (Controller)** : vérifier l'exposition des endpoints REST et le comportement HTTP.
+2. **Business Layer (Service)** : vérifier les règles métier, les traitements et les orchestrations.
+3. **Persistence Layer (Repository)** : vérifier les opérations d'accès et de manipulation des données.
+
+Chaque couche est testée indépendamment en simulant ses dépendances lorsque cela est nécessaire.
+
+Cette approche permet de détecter rapidement les anomalies, de limiter les effets de bord et de faciliter la maintenance des microservices.
+
+**Technologies principales :** JUnit 5, Mockito, AssertJ et Spring Test.
 
 ## 2. Concepts fondamentaux
 
-### 2.1. Isolation
+### 2.1. Isolation des tests
 
-Un test unitaire vérifie une unité sans exécuter réellement ses dépendances.
+L'isolation consiste à tester une couche sans exécuter réellement les couches dont elle dépend.
 
-Les dépendances telles que les repositories, les clients REST ou les autres services sont simulées avec des objets Mock.
+Par exemple :
 
-Cela permet de contrôler les réponses des dépendances et de tester uniquement la logique de la classe ciblée.
+- Le Controller est testé sans exécuter le Service réel.
+- Le Service est testé sans accéder réellement au Repository ou aux API externes.
+- Le Repository est testé avec un contexte de persistence dédié et une base de données de test.
+
+Les dépendances peuvent être simulées avec Mockito ou remplacées par des composants de test adaptés.
 
 ### 2.2. Pattern AAA (Arrange – Act – Assert)
 
-Le pattern AAA est une convention de structuration des tests en trois étapes :
+Le pattern AAA est une convention permettant de structurer les tests en trois étapes :
 
 - **Arrange** : préparer les données et les dépendances nécessaires.
-- **Act** : exécuter la méthode à tester.
+- **Act** : exécuter la méthode ou l'opération à tester.
 - **Assert** : vérifier le résultat obtenu.
 
 ```java
@@ -61,9 +73,7 @@ JUnit 5 est un framework de test Java permettant de structurer, exécuter et vé
 
 ### 2.4. Mockito
 
-Mockito est un framework Java permettant de simuler les dépendances d'une classe afin de tester son comportement indépendamment de leur implémentation réelle.
-
-Concepts principaux :
+Mockito permet de simuler les dépendances d'une classe afin de tester son comportement indépendamment de leur implémentation réelle.
 
 | Concept | Description |
 |---|---|
@@ -78,98 +88,41 @@ Concepts principaux :
 | `@Mock` | Crée un objet simulé. |
 | `@InjectMocks` | Injecte les mocks dans la classe testée. |
 
-## 3. Tests unitaires des Services
+## 3. REST Layer – Tests des Controllers
 
-Les Services contiennent généralement la logique métier de l'application : calculs, règles de gestion, validations métier et orchestration des appels aux dépendances.
+### 3.1. Présentation
 
-Les tests unitaires des Services utilisent **JUnit 5 et Mockito**.
+La REST Layer représente la couche d'exposition des services. Elle est généralement constituée des Controllers qui exposent les endpoints REST et assurent la communication HTTP entre les consommateurs et les Services.
 
-Les dépendances du Service, comme les repositories ou les clients REST, sont simulées afin de tester uniquement la logique métier.
+Les tests de cette couche permettent de vérifier que les endpoints fonctionnent conformément au contrat API défini.
 
-### Exemple : test d'un Service
+Ils ne doivent pas tester la logique métier, qui relève de la Business Layer.
 
-Classe métier :
+### 3.2. Éléments testés
 
-```java
-@Service
-@RequiredArgsConstructor
-public class UserService {
+Les tests des Controllers permettent notamment de vérifier :
 
-    private final UserRepository userRepository;
+- Les mappings HTTP : GET, POST, PUT, PATCH et DELETE.
+- Les paramètres de requête : `@PathVariable`, `@RequestParam` et `@RequestBody`.
+- Les codes de réponse HTTP : 200, 201, 204, 400, 404, 500, etc.
+- La structure et le contenu des réponses JSON.
+- La désérialisation et la sérialisation des DTO.
+- Les validations des entrées avec `@Valid`, `@NotNull`, `@NotBlank`, etc.
+- La gestion des exceptions et la structure des erreurs HTTP.
+- La délégation correcte des traitements au Service.
 
-    public User findById(Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() ->
-                        new UserNotFoundException("Utilisateur introuvable"));
-    }
+### 3.3. Technologies utilisées
 
-    public User save(User user) {
-        return userRepository.save(user);
-    }
-}
-```
+| Technologie | Rôle |
+|---|---|
+| JUnit 5 | Organisation et exécution des tests. |
+| MockMvc | Simulation des requêtes HTTP sans démarrer un serveur réel. |
+| Mockito | Simulation des Services appelés par le Controller. |
+| `@WebMvcTest` | Chargement ciblé de la couche Web. |
+| AssertJ | Vérification expressive des résultats. |
+| JsonPath | Vérification du contenu des réponses JSON. |
 
-Test unitaire :
-
-```java
-@ExtendWith(MockitoExtension.class)
-class UserServiceTest {
-
-    @Mock
-    private UserRepository userRepository;
-
-    @InjectMocks
-    private UserService userService;
-
-    @Test
-    void shouldReturnUserWhenFound() {
-
-        // Arrange
-        User user = new User(1L, "Ahmed");
-
-        when(userRepository.findById(1L))
-                .thenReturn(Optional.of(user));
-
-        // Act
-        User result = userService.findById(1L);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(1L, result.getId());
-        assertEquals("Ahmed", result.getName());
-
-        verify(userRepository).findById(1L);
-    }
-
-    @Test
-    void shouldThrowExceptionWhenUserNotFound() {
-
-        // Arrange
-        when(userRepository.findById(1L))
-                .thenReturn(Optional.empty());
-
-        // Act & Assert
-        assertThrows(UserNotFoundException.class,
-                () -> userService.findById(1L));
-
-        verify(userRepository).findById(1L);
-    }
-}
-```
-
-## 4. Tests des ressources REST (Controllers)
-
-Les Controllers exposent les endpoints REST et assurent la communication HTTP entre les consommateurs et les Services.
-
-Pour tester cette couche, on utilise généralement **JUnit 5 + MockMvc + Mockito**.
-
-- **MockMvc** : simule les requêtes HTTP sans démarrer un véritable serveur web.
-- **Mockito** : simule le Service appelé par le Controller.
-- **@WebMvcTest** : charge uniquement la couche Web ciblée.
-
-Ces tests vérifient notamment les mappings HTTP, les codes de réponse, les DTO, la sérialisation JSON et les validations.
-
-### Exemple : test d'un Controller REST
+### 3.4. Exemple de test Controller
 
 Controller :
 
@@ -220,42 +173,261 @@ class UserControllerTest {
 }
 ```
 
-## 5. Différence entre les tests Service et Controller
+**Résultat attendu :** vérifier que l'endpoint retourne une réponse HTTP 200 avec les données JSON attendues et qu'il délègue le traitement au Service.
 
-| Critère | Test Service | Test Controller |
-|---|---|---|
-| Framework | JUnit 5 | JUnit 5 |
-| Simulation des dépendances | Mockito | Mockito |
-| Simulation HTTP | Non | MockMvc |
-| Chargement du contexte Spring | Non | Contexte Web ciblé |
-| Vérification de la logique métier | Oui | Non, elle est déléguée au Service |
-| Vérification des codes HTTP | Non | Oui |
-| Vérification du JSON | Non | Oui |
-| Type de test | Test unitaire | Test de couche Web |
+## 4. Business Layer – Tests des Services
 
-**Remarque :** un test `@WebMvcTest` est un test ciblé de la couche Web, souvent appelé *Web Layer Test*. Il ne constitue pas un test unitaire pur au même sens qu'un test de Service isolé.
+### 4.1. Présentation
 
-## 6. Bonnes pratiques
+La Business Layer contient la logique métier du microservice. Elle est généralement constituée des Services qui implémentent les règles de gestion et orchestrent les traitements.
 
+C'est la couche principale pour les tests unitaires, car elle porte les comportements fonctionnels de l'application.
+
+Les tests doivent vérifier la logique métier indépendamment de la base de données, des Controllers et des services externes.
+
+### 4.2. Éléments testés
+
+Les tests des Services permettent notamment de vérifier :
+
+- Les règles de gestion métier.
+- Les calculs et les traitements fonctionnels.
+- Les conditions et les décisions métier.
+- Les validations métier.
+- Les transformations de données entre DTO et entités.
+- L'orchestration des appels aux repositories et aux clients externes.
+- La gestion des exceptions métier.
+- Les différents scénarios fonctionnels : succès, absence de données, données invalides et erreurs externes.
+
+### 4.3. Technologies utilisées
+
+| Technologie | Rôle |
+|---|---|
+| JUnit 5 | Organisation et exécution des tests. |
+| Mockito | Simulation des repositories et clients externes. |
+| AssertJ | Vérification expressive des résultats. |
+| `@ExtendWith(MockitoExtension.class)` | Initialisation de Mockito sans contexte Spring. |
+| `@Mock` | Simulation des dépendances. |
+| `@InjectMocks` | Injection des mocks dans le Service testé. |
+
+### 4.4. Exemple de test Service
+
+Service :
+
+```java
+@Service
+@RequiredArgsConstructor
+public class UserService {
+
+    private final UserRepository userRepository;
+
+    public User findById(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() ->
+                        new UserNotFoundException("Utilisateur introuvable"));
+    }
+}
+```
+
+Test du Service :
+
+```java
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @InjectMocks
+    private UserService userService;
+
+    @Test
+    void shouldReturnUserWhenFound() {
+
+        // Arrange
+        User user = new User(1L, "Ahmed");
+
+        when(userRepository.findById(1L))
+                .thenReturn(Optional.of(user));
+
+        // Act
+        User result = userService.findById(1L);
+
+        // Assert
+        assertThat(result)
+                .isNotNull()
+                .extracting(User::getName)
+                .isEqualTo("Ahmed");
+
+        verify(userRepository).findById(1L);
+    }
+
+    @Test
+    void shouldThrowExceptionWhenUserNotFound() {
+
+        // Arrange
+        when(userRepository.findById(1L))
+                .thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThatThrownBy(() -> userService.findById(1L))
+                .isInstanceOf(UserNotFoundException.class)
+                .hasMessage("Utilisateur introuvable");
+    }
+}
+```
+
+**Résultat attendu :** vérifier que le Service applique correctement les règles métier, retourne le résultat attendu et gère les exceptions indépendamment de la base de données.
+
+## 5. Persistence Layer – Tests des Repositories
+
+### 5.1. Présentation
+
+La Persistence Layer représente la couche responsable de l'accès aux données et de leur manipulation.
+
+Dans Spring Boot, elle est généralement constituée des interfaces Repository basées sur Spring Data JPA.
+
+Contrairement aux tests des Controllers et des Services, les tests des Repositories nécessitent généralement un environnement de persistence réel ou simulé, car ils doivent vérifier le comportement des requêtes et des opérations SQL/JPA.
+
+Ces tests sont donc principalement des **tests d'intégration ciblés**, et non des tests unitaires purs.
+
+### 5.2. Éléments testés
+
+Les tests des Repositories permettent notamment de vérifier :
+
+- Les opérations CRUD : création, lecture, modification et suppression.
+- Les méthodes générées automatiquement par Spring Data JPA.
+- Les requêtes personnalisées avec `@Query`.
+- Les requêtes JPQL et natives SQL.
+- Les critères de recherche et les filtres.
+- Les relations entre entités : `@OneToMany`, `@ManyToOne`, `@OneToOne`, etc.
+- Les contraintes de persistence et les mappings JPA.
+- La pagination et le tri.
+- Le comportement des transactions et du contexte de persistence lorsque cela est pertinent.
+
+### 5.3. Technologies utilisées
+
+| Technologie | Rôle |
+|---|---|
+| JUnit 5 | Organisation et exécution des tests. |
+| Spring Data JPA | Couche d'accès aux données. |
+| `@DataJpaTest` | Chargement ciblé de la couche JPA. |
+| TestEntityManager | Manipulation des entités dans les tests. |
+| AssertJ | Vérification des résultats. |
+| H2 | Base de données embarquée pour les tests. |
+| Testcontainers | Exécution de tests avec une véritable base de données dans un conteneur. |
+
+### 5.4. Exemple de test Repository
+
+Repository :
+
+```java
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+
+    Optional<User> findByEmail(String email);
+}
+```
+
+Test du Repository :
+
+```java
+@DataJpaTest
+class UserRepositoryTest {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Test
+    void shouldFindUserByEmail() {
+
+        // Arrange
+        User user = new User(null, "Ahmed", "ahmed@test.com");
+
+        userRepository.saveAndFlush(user);
+
+        // Act
+        Optional<User> result =
+                userRepository.findByEmail("ahmed@test.com");
+
+        // Assert
+        assertThat(result)
+                .isPresent()
+                .get()
+                .extracting(User::getName)
+                .isEqualTo("Ahmed");
+    }
+}
+```
+
+**Résultat attendu :** vérifier que Spring Data JPA exécute correctement la recherche et retourne l'entité correspondant au critère demandé.
+
+**Remarque :** `@DataJpaTest` utilise généralement une base embarquée si elle est disponible sur le classpath. Pour les projets utilisant des fonctionnalités spécifiques à Oracle ou PostgreSQL, privilégier Testcontainers avec le même moteur de base de données que celui utilisé en production.
+
+## 6. Synthèse des tests par couche
+
+Chaque couche possède son propre périmètre de test et ses propres outils.
+
+| Couche | Éléments testés | Outils principaux | Type de test |
+|---|---|---|---|
+| REST (Controller) | Endpoints, HTTP, DTO, JSON, validations | JUnit 5, MockMvc, Mockito | Test de couche Web |
+| Business (Service) | Règles métier, calculs, exceptions, orchestration | JUnit 5, Mockito, AssertJ | Test unitaire |
+| Persistence (Repository) | CRUD, requêtes SQL/JPQL, mappings JPA | JUnit 5, DataJpaTest, Testcontainers | Test d'intégration ciblé |
+
+### 6.1. Principe d'indépendance entre les couches
+
+L'objectif est de garantir que chaque couche puisse être testée sans dépendre de l'exécution réelle des autres couches.
+
+Exemple d'organisation :
+
+```text
+Microservice User
+│
+├── controller/
+│   ├── UserController.java
+│   └── UserControllerTest.java
+│
+├── service/
+│   ├── UserService.java
+│   └── UserServiceTest.java
+│
+├── repository/
+│   ├── UserRepository.java
+│   └── UserRepositoryTest.java
+│
+└── entity/
+    └── User.java
+```
+
+Cette organisation permet de :
+
+- Détecter rapidement les anomalies dans la couche concernée.
+- Limiter les dépendances entre les tests.
+- Faciliter la maintenance et les évolutions fonctionnelles.
+- Exécuter les tests indépendamment pour chaque microservice.
+- Identifier plus facilement l'origine d'une régression.
+
+## 7. Bonnes pratiques
+
+- Organiser les tests par microservice et par couche.
 - Respecter le pattern Arrange – Act – Assert.
 - Tester une responsabilité précise par test.
 - Utiliser des noms explicites décrivant le comportement attendu.
 - Couvrir les cas nominaux, les cas limites et les cas d'erreur.
-- Isoler les dépendances externes avec Mockito.
-- Éviter les dépendances entre les tests.
-- Vérifier les interactions uniquement lorsqu'elles sont pertinentes.
-- Privilégier les tests de comportement plutôt que les tests d'implémentation.
+- Isoler les dépendances avec Mockito lorsque cela est pertinent.
+- Ne pas tester la logique métier dans les Controllers.
+- Ne pas simuler le Repository lorsqu'on souhaite vérifier réellement une requête JPA.
+- Privilégier Testcontainers lorsque la compatibilité avec le moteur de base de données est importante.
 - Éviter `@SpringBootTest` pour les tests unitaires simples.
-- Ne pas utiliser MockMvc pour tester directement la logique métier d'un Service.
+- Éviter les dépendances entre les tests.
+- Intégrer l'exécution des tests dans le pipeline CI/CD.
+- Mesurer la couverture de code avec JaCoCo, sans considérer le taux de couverture comme le seul indicateur de qualité.
 
-## 7. À retenir
+## 8. À retenir
 
-Les tests unitaires permettent de vérifier individuellement les composants métier et de détecter rapidement les anomalies.
+Dans une architecture microservices Spring Boot, les tests doivent être organisés indépendamment pour chaque microservice et chaque couche.
 
-Dans une application Spring Boot :
+- **REST Layer** : tester le contrat HTTP, les endpoints, les validations et les réponses JSON.
+- **Business Layer** : tester les règles métier et les traitements fonctionnels.
+- **Persistence Layer** : tester les requêtes, les opérations CRUD et les mappings JPA.
 
-- **Services** : JUnit 5 + Mockito.
-- **Controllers REST** : JUnit 5 + MockMvc + Mockito.
-- **Repositories** : `@DataJpaTest` pour les tests d'intégration avec la couche persistence.
-
-**Technologies principales :** JUnit 5, Mockito, AssertJ et Spring Test.
+Il est important de distinguer les tests unitaires purs des tests d'intégration ciblés :
